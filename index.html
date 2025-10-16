@@ -114,16 +114,30 @@
                 </div>
             </div>
 
-            <!-- Reports and other tabs remain the same -->
-            <div id="reports" class="hidden space-y-6"></div>
-            <div id="history" class="hidden space-y-6"></div>
-            <div id="settings" class="hidden space-y-6"></div>
+            <!-- Placeholder content for other tabs -->
+            <div id="reports" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <h2 class="text-2xl font-bold mb-4">דוחות וניתוחים</h2>
+                    <p class="text-gray-600">בקרוב יוצגו כאן דוחות וגרפים מתקדמים.</p>
+                </div>
+            </div>
+            <div id="history" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <h2 class="text-2xl font-bold mb-4">היסטוריית הוצאות</h2>
+                    <p class="text-gray-600">בקרוב תוכל לסנן ולחפש בכל היסטוריית ההוצאות.</p>
+                </div>
+            </div>
+            <div id="settings" class="hidden space-y-6">
+                 <div class="bg-white p-6 rounded-xl shadow-md text-center">
+                    <h2 class="text-2xl font-bold mb-4">הגדרות ותקציב</h2>
+                    <p class="text-gray-600">בקרוב תוכל להגדיר את התקציב החודשי, יעדים וקטגוריות.</p>
+                </div>
+            </div>
         </main>
     </div>
 
     <script>
     // --- Dynamic Manifest Injection (Robust Solution) ---
-    // This code creates the manifest file safely, avoiding encoding errors.
     const manifest = {
       "name": "ניהול פיננסי",
       "short_name": "כספים",
@@ -146,8 +160,8 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         const App = {
-            // *** חשוב מאוד: הדבק כאן את כתובת ה-URL החדשה שקיבלת ***
-            gasUrl: 'https://script.google.com/macros/s/AKfycbx9MXz3Fogzb4xQWW3lx3AL93ac6nr610fz4pS1Qk1YxKv7YOehu7ZM00mqzlL-y2KMaQ/exec', // <--- הדבק כאן את הכתובת שלך!
+            // *** חשוב מאוד: הדבק כאן את כתובת ה-URL שקיבלת ***
+            gasUrl: 'https://script.google.com/macros/s/AKfycbx9MXz3Fogzb4xQWW3lx3AL93ac6nr610fz4pS1Qk1YxKv7YOehu7ZM00mqzlL-y2KMaQ/exec',
 
             state: {
                 settings: {},
@@ -213,64 +227,82 @@
                         App.render.all();
                     }
                 },
+                switchTab: (e) => {
+                    e.preventDefault();
+                    const clickedTab = e.target.closest('a[data-tab]');
+                    if (!clickedTab) return;
+
+                    const tabId = clickedTab.dataset.tab;
+                    
+                    document.querySelectorAll('#tabs a').forEach(tab => {
+                        tab.classList.remove('tab-active', 'font-semibold');
+                        tab.classList.add('text-gray-500', 'hover:text-blue-600', 'border-transparent');
+                    });
+                    clickedTab.classList.add('tab-active', 'font-semibold');
+                    clickedTab.classList.remove('text-gray-500', 'hover:text-blue-600', 'border-transparent');
+
+                    document.querySelectorAll('#tab-content > div').forEach(content => {
+                        content.classList.add('hidden');
+                    });
+                    document.getElementById(tabId).classList.remove('hidden');
+
+                    const renderFunction = App.render[tabId];
+                    if (typeof renderFunction === 'function') {
+                        renderFunction();
+                    }
+                },
                  addExpense: async (e) => {
                     e.preventDefault();
                     const newExpense = {
-                        id: 'id-' + Date.now(), // Create a temporary unique ID
+                        id: 'id-' + Date.now(),
                         date: App.utils.getTodayDateString(),
                         description: document.getElementById('expenseDescription').value.trim(),
                         category: document.getElementById('expenseCategory').value,
                         amount: parseFloat(document.getElementById('expenseAmount').value),
                     };
                     
-                    App.state.expenses.push(newExpense); // Optimistic update
-                    App.render.dashboard(); // Re-render immediately for better UX
+                    App.state.expenses.push(newExpense);
+                    App.render.dashboard();
                     e.target.reset();
 
                     const result = await App.api.postToSheet('addExpense', newExpense);
                     if (result && result.status === 'success') {
                         App.core.showExpenseFeedback(newExpense);
-                        // Optional: Refresh data from sheet to get the final ID if needed
-                        App.core.loadData(); 
+                        await App.core.loadData(); 
                     } else {
-                        alert('שגיאה בעדכון ה-Google Sheet. ההוצאה נשמרה מקומית, אך יש לרענן.');
-                        // Revert optimistic update if server fails
+                        alert('שגיאה בעדכון ה-Google Sheet.');
                         App.state.expenses.pop();
                         App.render.dashboard();
                     }
                 },
                 deleteExpense: async (expenseId) => {
                     if (!confirm('האם אתה בטוח שברצונך למחוק את ההוצאה?')) return;
-
-                    // Optimistic update: remove from local state first
                     const expenseIndex = App.state.expenses.findIndex(e => e.id == expenseId);
                     if (expenseIndex === -1) return;
                     
                     const expenseToDelete = App.state.expenses[expenseIndex];
                     App.state.expenses.splice(expenseIndex, 1);
-                    App.render.dashboard(); // Re-render UI immediately
+                    App.render.dashboard();
 
                     const result = await App.api.postToSheet('deleteExpense', { id: expenseId });
                     
                     if (!result || result.status !== 'success') {
-                        alert('שגיאה במחיקת ההוצאה מה-Google Sheet. נא לרענן.');
-                        // Revert the change if the server call failed
+                        alert('שגיאה במחיקת ההוצאה מה-Google Sheet.');
                         App.state.expenses.splice(expenseIndex, 0, expenseToDelete);
                         App.render.dashboard();
                     }
                 },
                 showExpenseFeedback: (newExpense) => {
-                    // This function remains the same
+                    // This function remains the same but needs to be implemented fully
                 },
                 saveSettings: async () => {
-                    // This function remains the same
+                    // This function remains to be implemented
                 },
             },
 
             render: {
                 all: () => {
                     App.render.dashboard();
-                    // other render functions can be called here or on tab change
                 },
                 dashboard: () => {
                     const todayString = App.utils.getTodayDateString();
@@ -289,9 +321,7 @@
                                     <td class="px-6 py-4 font-semibold">${App.utils.formatCurrency(exp.amount)}</td>
                                     <td class="px-6 py-4">
                                         <button class="text-red-500 hover:text-red-700 delete-btn" data-id="${exp.id}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                            </svg>
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                         </button>
                                     </td>
                                 </tr>
@@ -299,44 +329,33 @@
                             tableBody.insertAdjacentHTML('beforeend', row);
                         });
                     }
-                    // Update stats, categories etc.
+                    // TODO: Update stats, categories etc.
                 },
-                // Other render functions...
+                reports: () => { /* Placeholder for future implementation */ },
+                history: () => { /* Placeholder for future implementation */ },
+                settings: () => { /* Placeholder for future implementation */ },
             },
 
             init: () => {
                 if (!App.gasUrl) {
                     alert("נא להדביק את כתובת ה-URL של Google Apps Script במשתנה 'gasUrl' בקוד כדי שהאפליקציה תעבוד.");
-                    document.getElementById('loadingOverlay').classList.remove('hidden');
                     return;
                 }
 
                 App.core.loadData();
 
                 // Event Listeners
+                document.getElementById('tabs').addEventListener('click', App.core.switchTab);
                 document.getElementById('addExpenseForm').addEventListener('submit', App.core.addExpense);
-                
-                // Event delegation for delete buttons
                 document.getElementById('dailyExpensesTable').addEventListener('click', (e) => {
                     const deleteButton = e.target.closest('.delete-btn');
-                    if (deleteButton) {
-                        const expenseId = deleteButton.dataset.id;
-                        App.core.deleteExpense(expenseId);
-                    }
+                    if (deleteButton) App.core.deleteExpense(deleteButton.dataset.id);
                 });
-
                 document.getElementById('closeModal').addEventListener('click', () => {
-                    const modal = document.getElementById('feedbackModal');
-                    modal.classList.add('opacity-0');
-                    modal.querySelector('.modal-content').classList.add('scale-95');
-                    setTimeout(() => modal.classList.add('hidden'), 300);
+                    document.getElementById('feedbackModal').classList.add('hidden', 'opacity-0');
                 });
-
-                 // Listen for app visibility change to sync data
                 document.addEventListener('visibilitychange', () => {
-                    if (document.visibilityState === 'visible') {
-                        App.core.loadData();
-                    }
+                    if (document.visibilityState === 'visible') App.core.loadData();
                 });
             }
         };
