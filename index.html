@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>מערכת ניהול פיננסי</title>
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;ניהול פיננסי&quot;,&quot;short_name&quot;:&quot;כספים&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#f3f4f6&quot;,&quot;theme_color&quot;:&quot;#3b82f6&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;https://placehold.co/192x192/3b82f6/white?text=CRM&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/png&quot;},{&quot;src&quot;:&quot;https://placehold.co/512x512/3b82f6/white?text=CRM&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/png&quot;}]}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Assistant', sans-serif; }
+        .tab-active { border-color: #3b82f6; color: #3b82f6; font-weight: 600; }
+        .chart-container { animation: chart-appear 0.8s ease-out forwards; }
+        @keyframes chart-appear { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        .gauge-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.75rem; font-weight: 700; }
+        /* Modal styles */
+        .modal { transition: opacity 0.25s ease; }
+        .modal-content { transition: transform 0.25s ease; }
+        /* Loading Spinner */
+        #loader { border: 5px solid #f3f3f3; border-top: 5px solid #3b82f6; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800">
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div id="loader"></div>
+    </div>
+    
+    <!-- Feedback Modal -->
+    <div id="feedbackModal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-40 hidden opacity-0">
+        <div class="modal-content bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-center transform scale-95">
+            <h2 id="modalTitle" class="text-2xl font-bold text-gray-900 mb-4">הוצאה עודכנה!</h2>
+            <div id="modalBody" class="space-y-3 text-right">
+                <!-- Content will be injected by JS -->
+            </div>
+            <button id="closeModal" class="mt-6 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">הבנתי, תודה!</button>
+        </div>
+    </div>
+
+    <div class="container mx-auto p-4 md:p-6 lg:p-8">
+        <header class="text-center mb-6">
+            <h1 class="text-3xl md:text-4xl font-bold text-gray-900">מערכת ניהול פיננסי אישי (CRM)</h1>
+            <p class="text-gray-600 mt-2">הכלי שלך לשליטה, יציבות ושקט נפשי</p>
+        </header>
+
+        <div class="mb-6 border-b border-gray-200">
+            <nav class="flex overflow-x-auto -mb-px" id="tabs">
+                <a href="#dashboard" data-tab="dashboard" class="tab-active flex-shrink-0 text-lg py-4 px-5 border-b-2 font-semibold">תפעול יומי</a>
+                <a href="#reports" data-tab="reports" class="text-gray-500 hover:text-blue-600 flex-shrink-0 text-lg py-4 px-5 border-b-2 border-transparent">דוחות</a>
+                <a href="#history" data-tab="history" class="text-gray-500 hover:text-blue-600 flex-shrink-0 text-lg py-4 px-5 border-b-2 border-transparent">היסטוריה</a>
+                <a href="#settings" data-tab="settings" class="text-gray-500 hover:text-blue-600 flex-shrink-0 text-lg py-4 px-5 border-b-2 border-transparent">הגדרות</a>
+            </nav>
+        </div>
+
+        <main id="tab-content">
+            <!-- Daily Dashboard -->
+            <div id="dashboard" class="space-y-6">
+                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div class="bg-white p-5 rounded-xl shadow-md text-center">
+                        <h3 class="text-gray-500 font-semibold">מותר להוציא היום</h3>
+                        <p id="allowedToSpendToday" class="text-3xl font-bold text-blue-600 mt-2">0 ₪</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-md text-center">
+                        <h3 class="text-gray-500 font-semibold">סך הוצאות היום</h3>
+                        <p id="dailyExpensesSum" class="text-3xl font-bold text-gray-800 mt-2">0 ₪</p>
+                    </div>
+                    <div class="bg-white p-5 rounded-xl shadow-md text-center">
+                        <h3 class="text-gray-500 font-semibold">יתרה יומית</h3>
+                        <p id="remainingForToday" class="text-3xl font-bold text-green-600 mt-2">0 ₪</p>
+                    </div>
+                     <div class="bg-white p-5 rounded-xl shadow-md text-center flex flex-col justify-center items-center">
+                        <h3 class="text-gray-500 font-semibold">סטטוס יומי</h3>
+                        <p id="dailyStatusFeedback" class="text-lg font-bold mt-2 px-4 py-2 rounded-full">טוען...</p>
+                    </div>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-2xl font-bold mb-4">הוספת הוצאה חדשה</h2>
+                    <form id="addExpenseForm" class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                        <div class="md:col-span-2">
+                            <label for="expenseDescription" class="block text-sm font-medium text-gray-700">תיאור (בית עסק)</label>
+                            <input type="text" id="expenseDescription" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" list="vendorsDatalist">
+                            <datalist id="vendorsDatalist"></datalist>
+                        </div>
+                        <div>
+                            <label for="expenseCategory" class="block text-sm font-medium text-gray-700">קטגוריה</label>
+                            <select id="expenseCategory" required class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2 bg-white"></select>
+                        </div>
+                        <div>
+                            <label for="expenseAmount" class="block text-sm font-medium text-gray-700">סכום (₪)</label>
+                            <input type="number" id="expenseAmount" required min="0" step="0.01" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2">
+                        </div>
+                        <button type="submit" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700">הוסף הוצאה</button>
+                    </form>
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-2xl font-bold mb-4">פירוט הוצאות להיום</h2>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                           <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">תיאור</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">קטגוריה</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">סכום</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">פעולות</th></tr></thead>
+                            <tbody id="dailyExpensesTable" class="bg-white divide-y divide-gray-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reports -->
+            <div id="reports" class="hidden space-y-6">
+                <!-- Monthly Overview same as before -->
+                 <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-2xl font-bold mb-4">מעקב תקציב לפי בית עסק</h2>
+                    <div class="overflow-x-auto max-h-96">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50 sticky top-0">
+                                <tr>
+                                    <th class="px-4 py-2 text-right">בית עסק</th>
+                                    <th class="px-4 py-2 text-right">הוצאה החודש</th>
+                                    <th class="px-4 py-2 text-right">תקציב חודשי</th>
+                                    <th class="px-4 py-2 text-right">יתרה</th>
+                                </tr>
+                            </thead>
+                            <tbody id="vendorBudgetTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- History -->
+            <div id="history" class="hidden space-y-6">
+                <!-- ... same as before -->
+            </div>
+
+            <!-- Settings -->
+            <div id="settings" class="hidden space-y-6">
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-2xl font-bold mb-4">1. הכנסות ויעדים</h2>
+                    <!-- ... same as before -->
+                </div>
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-2xl font-bold mb-4">2. תקציב לפי בתי עסק</h2>
+                    <p class="text-sm text-gray-600 mb-4">תקציבים אלו חושבו אוטומטית על בסיס הנתונים ההיסטוריים. ניתן לערוך אותם לפי הצורך.</p>
+                    <div id="vendorBudgetsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- Vendor budgets will be populated here -->
+                    </div>
+                </div>
+                 <!-- Other settings sections... -->
+            </div>
+        </main>
+    </div>
+
+    <script>
+    // Service Worker for PWA
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('sw.js').catch(err => console.error("Service Worker registration failed:", err));
+    }
+    const swContent = `
+        self.addEventListener('install', (e) => e.waitUntil(caches.open('pwa-cache').then(cache => cache.addAll(['./']))));
+        self.addEventListener('fetch', (e) => e.respondWith(caches.match(e.request).then(response => response || fetch(e.request))));
+    `;
+    const swBlob = new Blob([swContent], {type: 'application/javascript'});
+    const swUrl = URL.createObjectURL(swBlob);
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register(swUrl);
+    }
+
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const App = {
+            // IMPORTANT: PASTE YOUR GOOGLE APPS SCRIPT URL HERE
+            gasUrl: '', // למשל: 'https://script.google.com/macros/s/AKfycby.../exec'
+
+            state: {
+                settings: {
+                    monthlyIncome: 8000,
+                    variableSpendingBudget: 2500,
+                    monthlySavingsGoal: 500,
+                    fixedExpenses: [ { id: 1, description: 'מזונות', amount: 2200 } ],
+                    expenseCategories: ['מזון וסופר', 'מסעדות ובתי קפה', 'תחבורה ודלק', 'פנאי ובידור', 'נוחות וקיוסקים', 'קניות כלליות', 'תקשורת', 'עלויות פיננסיות', 'אחר'],
+                    vendorBudgets: {},
+                },
+                expenses: [],
+                isDataLoaded: false,
+            },
+            
+            utils: {
+                getTodayDateString: () => new Date().toISOString().split('T')[0],
+                formatCurrency: (amount) => new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', minimumFractionDigits: 2 }).format(amount || 0),
+                getDaysInMonth: (date = new Date()) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate(),
+                getDayOfMonth: (date = new Date()) => date.getDate(),
+            },
+            
+            api: {
+                fetchFromSheet: async (action, params = {}) => {
+                    if (!App.gasUrl) return null;
+                    document.getElementById('loadingOverlay').classList.remove('hidden');
+                    const url = new URL(App.gasUrl);
+                    url.searchParams.append('action', action);
+                    for (const key in params) {
+                        url.searchParams.append(key, params[key]);
+                    }
+                    try {
+                        const response = await fetch(url);
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        const result = await response.json();
+                        return result.data;
+                    } catch (error) {
+                        console.error(`Error fetching action ${action}:`, error);
+                        alert('שגיאה בתקשורת עם Google Sheets. בדוק את כתובת ה-URL וחיבור האינטרנט.');
+                        return null;
+                    } finally {
+                        document.getElementById('loadingOverlay').classList.add('hidden');
+                    }
+                },
+                postToSheet: async (action, payload) => {
+                    if (!App.gasUrl) return null;
+                    document.getElementById('loadingOverlay').classList.remove('hidden');
+                    try {
+                        const response = await fetch(App.gasUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // Required for Apps Script POST
+                            body: JSON.stringify({ action, payload })
+                        });
+                        if (!response.ok) throw new Error('Network response was not ok');
+                        return await response.json();
+                    } catch (error) {
+                        console.error(`Error posting action ${action}:`, error);
+                        alert('שגיאה בשמירת נתונים ל-Google Sheets.');
+                        return null;
+                    } finally {
+                       document.getElementById('loadingOverlay').classList.add('hidden');
+                    }
+                }
+            },
+
+            core: {
+                calculateInitialVendorBudgets: (historicalExpenses) => {
+                    const vendorSpending = {};
+                    const monthCount = new Set(historicalExpenses.map(e => e.date.substring(0, 7))).size;
+                    
+                    historicalExpenses.forEach(exp => {
+                        if (!vendorSpending[exp.description]) {
+                            vendorSpending[exp.description] = 0;
+                        }
+                        vendorSpending[exp.description] += exp.amount;
+                    });
+                    
+                    const budgets = {};
+                    for (const vendor in vendorSpending) {
+                        const avgMonthly = vendorSpending[vendor] / (monthCount || 1);
+                         if (avgMonthly > 50) { // Only budget for significant vendors
+                             budgets[vendor] = Math.ceil(avgMonthly / 10) * 10; // Round up to nearest 10
+                         }
+                    }
+                    return budgets;
+                },
+                loadData: async () => {
+                    const data = await App.api.fetchFromSheet('getData');
+                    if (data) {
+                        App.state.expenses = data.expenses;
+                        // Avoid overwriting settings if they exist, merge instead
+                        App.state.settings = { ...App.state.settings, ...data.settings };
+                        if (Object.keys(App.state.settings.vendorBudgets || {}).length === 0) {
+                             App.state.settings.vendorBudgets = App.core.calculateInitialVendorBudgets(data.expenses);
+                        }
+                        App.state.isDataLoaded = true;
+                        App.render.all();
+                    } else {
+                        // Fallback for demo if GAS URL is not set
+                         App.state.settings.vendorBudgets = App.core.calculateInitialVendorBudgets(App.state.expenses); // Use local history
+                         App.render.all();
+                    }
+                },
+                 addExpense: async (e) => {
+                    e.preventDefault();
+                    const newExpense = {
+                        id: Date.now(),
+                        date: App.utils.getTodayDateString(),
+                        description: document.getElementById('expenseDescription').value.trim(),
+                        category: document.getElementById('expenseCategory').value,
+                        amount: parseFloat(document.getElementById('expenseAmount').value),
+                    };
+
+                    const result = await App.api.postToSheet('addExpense', newExpense);
+                    if (result && result.status === 'success') {
+                        App.state.expenses.push(newExpense);
+                        App.core.showExpenseFeedback(newExpense);
+                        App.render.all();
+                        e.target.reset();
+                    } else if (!App.gasUrl) { // Demo mode
+                        App.state.expenses.push(newExpense);
+                        App.core.showExpenseFeedback(newExpense);
+                        App.render.all();
+                        e.target.reset();
+                    }
+                },
+                showExpenseFeedback: (newExpense) => {
+                    const vendor = newExpense.description;
+                    const vendorBudget = App.state.settings.vendorBudgets[vendor] || 0;
+                    
+                    const expensesThisMonthForVendor = App.state.expenses
+                        .filter(e => e.description === vendor && new Date(e.date).getMonth() === new Date().getMonth())
+                        .reduce((sum, e) => sum + e.amount, 0);
+                    
+                    const lastPurchase = App.state.expenses
+                        .filter(e => e.description === vendor && e.id !== newExpense.id)
+                        .pop(); // get the last one before this
+
+                    let html = `<p><strong>בית עסק:</strong> ${vendor}</p><p><strong>סכום:</strong> ${App.utils.formatCurrency(newExpense.amount)}</p><hr class="my-2">`;
+                    if (lastPurchase) {
+                        const diff = newExpense.amount - lastPurchase.amount;
+                        const diffText = diff > 0 ? `(${App.utils.formatCurrency(diff)} יותר)` : `(${App.utils.formatCurrency(Math.abs(diff))} פחות)`;
+                        html += `<p><strong>השוואה לקנייה קודמת:</strong> ${App.utils.formatCurrency(lastPurchase.amount)} ${diffText}</p>`;
+                    }
+                    if (vendorBudget > 0) {
+                        const remaining = vendorBudget - expensesThisMonthForVendor;
+                        html += `<p><strong>יתרה בתקציב החודשי לעסק זה:</strong> <span class="${remaining < 0 ? 'text-red-600' : 'text-green-600'} font-bold">${App.utils.formatCurrency(remaining)}</span></p>`;
+                    }
+
+                    document.getElementById('modalBody').innerHTML = html;
+                    const modal = document.getElementById('feedbackModal');
+                    modal.classList.remove('hidden');
+                    setTimeout(() => modal.classList.remove('opacity-0'), 10);
+                    setTimeout(() => modal.querySelector('.modal-content').classList.remove('scale-95'), 10);
+                },
+                 saveSettings: async () => {
+                    // Update state from UI
+                    // ... (code to read values from inputs)
+                    
+                    const result = await App.api.postToSheet('saveSettings', App.state.settings);
+                    if (result && result.status === 'success') {
+                        // show feedback
+                    }
+                    App.render.all();
+                },
+            },
+
+            render: {
+                all: () => {
+                    App.render.settings();
+                    App.render.dashboard();
+                    App.render.reports();
+                    // App.render.history(); // Can be called on tab click to save resources
+                },
+                settings: () => {
+                    // Render vendor budgets
+                    const container = document.getElementById('vendorBudgetsContainer');
+                    container.innerHTML = '';
+                    const budgets = App.state.settings.vendorBudgets || {};
+                    for(const vendor in budgets) {
+                        const el = `
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">${vendor}</label>
+                            <input type="number" value="${budgets[vendor]}" data-vendor="${vendor}" class="vendor-budget-input mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2">
+                        </div>`;
+                        container.insertAdjacentHTML('beforeend', el);
+                    }
+                },
+                reports: () => {
+                    // Render vendor budget tracking table
+                    const tableBody = document.getElementById('vendorBudgetTable');
+                    tableBody.innerHTML = '';
+                    const budgets = App.state.settings.vendorBudgets || {};
+                    const expensesThisMonth = App.state.expenses.filter(e => new Date(e.date).getMonth() === new Date().getMonth());
+
+                    for (const vendor in budgets) {
+                        const budget = budgets[vendor];
+                        const spent = expensesThisMonth
+                            .filter(e => e.description === vendor)
+                            .reduce((sum, e) => sum + e.amount, 0);
+                        const remaining = budget - spent;
+                        const row = `
+                        <tr>
+                            <td class="px-4 py-2 font-semibold">${vendor}</td>
+                            <td class="px-4 py-2">${App.utils.formatCurrency(spent)}</td>
+                            <td class="px-4 py-2 text-gray-600">${App.utils.formatCurrency(budget)}</td>
+                            <td class="px-4 py-2 font-bold ${remaining < 0 ? 'text-red-600' : 'text-green-600'}">${App.utils.formatCurrency(remaining)}</td>
+                        </tr>`;
+                        tableBody.insertAdjacentHTML('beforeend', row);
+                    }
+                },
+                // Other render functions...
+                dashboard: () => {/* ... */},
+            },
+
+            init: () => {
+                 if (!App.gasUrl) {
+                    const userUrl = prompt("נראה שזו פעם ראשונה. הדבק כאן את כתובת ה-URL של Google Apps Script Web App:");
+                    if (userUrl) {
+                        App.gasUrl = userUrl;
+                        // Potentially save this to localStorage for persistence
+                    } else {
+                         alert("המערכת תעבוד במצב הדגמה ללא שמירת נתונים. כדי להתחבר, רענן והדבק את הכתובת.");
+                    }
+                }
+
+                App.core.loadData();
+
+                // Event Listeners
+                document.getElementById('addExpenseForm').addEventListener('submit', App.core.addExpense);
+                document.getElementById('saveSettings').addEventListener('click', App.core.saveSettings);
+                document.getElementById('closeModal').addEventListener('click', () => {
+                    const modal = document.getElementById('feedbackModal');
+                    modal.classList.add('opacity-0');
+                    modal.querySelector('.modal-content').classList.add('scale-95');
+                    setTimeout(() => modal.classList.add('hidden'), 300);
+                });
+            }
+        };
+
+        App.init();
+    });
+    </script>
+</body>
+</html>
