@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href="data:application/manifest+json,{&quot;name&quot;:&quot;ניהול פיננסי&quot;,&quot;short_name&quot;:&quot;כספים&quot;,&quot;start_url&quot;:&quot;.&quot;,&quot;display&quot;:&quot;standalone&quot;,&quot;background_color&quot;:&quot;#f3f4f6&quot;,&quot;theme_color&quot;:&quot;#3b82f6&quot;,&quot;icons&quot;:[{&quot;src&quot;:&quot;https://placehold.co/192x192/3b82f6/white?text=CRM&quot;,&quot;sizes&quot;:&quot;192x192&quot;,&quot;type&quot;:&quot;image/png&quot;},{&quot;src&quot;:&quot;https://placehold.co/512x512/3b82f6/white?text=CRM&quot;,&quot;sizes&quot;:&quot;512x512&quot;,&quot;type&quot;:&quot;image/png&quot;}]}">
+    <link rel="manifest" href='data:application/manifest+json,{"name":"ניהול פיננסי","short_name":"כספים","start_url":".","display":"standalone","background_color":"#f3f4f6","theme_color":"#3b82f6","icons":[{"src":"https://placehold.co/192x192/3b82f6/white?text=CRM","sizes":"192x192","type":"image/png"},{"src":"https://placehold.co/512x512/3b82f6/white?text=CRM","sizes":"512x512","type":"image/png"}]}'>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
@@ -122,21 +122,13 @@
     </div>
 
     <script>
-    // Service Worker for PWA - remains the same
-    if ('serviceWorker' in navigator) {
-        const swContent = `
-            self.addEventListener('install', (e) => e.waitUntil(caches.open('pwa-cache').then(cache => cache.addAll(['./']))));
-            self.addEventListener('fetch', (e) => e.respondWith(caches.match(e.request).then(response => response || fetch(e.request))));
-        `;
-        const swBlob = new Blob([swContent], {type: 'application/javascript'});
-        const swUrl = URL.createObjectURL(swBlob);
-        navigator.serviceWorker.register(swUrl).catch(err => console.error("Service Worker registration failed:", err));
-    }
-
+    // Service Worker registration code removed to fix blob protocol error.
+    // The "Add to Homescreen" functionality relies primarily on the manifest file.
+    
     document.addEventListener('DOMContentLoaded', () => {
         const App = {
             // *** חשוב מאוד: הדבק כאן את כתובת ה-URL החדשה שקיבלת ***
-            gasUrl: 'https://script.google.com/macros/s/AKfycbx9MXz3Fogzb4xQWW3lx3AL93ac6nr610fz4pS1Qk1YxKv7YOehu7ZM00mqzlL-y2KMaQ/exec', // <--- הדבק כאן את הכתובת שלך!
+            gasUrl: '', // <--- הדבק כאן את הכתובת שלך!
 
             state: {
                 settings: {},
