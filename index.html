@@ -7,7 +7,7 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="manifest" href='data:application/manifest+json,{"name":"ניהול פיננסי","short_name":"כספים","start_url":".","display":"standalone","background_color":"#f3f4f6","theme_color":"#3b82f6","icons":[{"src":"https://placehold.co/192x192/3b82f6/white?text=CRM","sizes":"192x192","type":"image/png"},{"src":"https://placehold.co/512x512/3b82f6/white?text=CRM","sizes":"512x512","type":"image/png"}]}'>
+    <!-- The problematic manifest link has been removed from here -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
@@ -122,13 +122,32 @@
     </div>
 
     <script>
-    // Service Worker registration code removed to fix blob protocol error.
-    // The "Add to Homescreen" functionality relies primarily on the manifest file.
-    
+    // --- Dynamic Manifest Injection (Robust Solution) ---
+    // This code creates the manifest file safely, avoiding encoding errors.
+    const manifest = {
+      "name": "ניהול פיננסי",
+      "short_name": "כספים",
+      "start_url": ".",
+      "display": "standalone",
+      "background_color": "#f3f4f6",
+      "theme_color": "#3b82f6",
+      "icons": [
+        { "src": "https://placehold.co/192x192/3b82f6/white?text=CRM", "sizes": "192x192", "type": "image/png" },
+        { "src": "https://placehold.co/512x512/3b82f6/white?text=CRM", "sizes": "512x512", "type": "image/png" }
+      ]
+    };
+    const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    const manifestUrl = URL.createObjectURL(manifestBlob);
+    const link = document.createElement('link');
+    link.rel = 'manifest';
+    link.href = manifestUrl;
+    document.head.appendChild(link);
+    // --------------------------------------------------------
+
     document.addEventListener('DOMContentLoaded', () => {
         const App = {
             // *** חשוב מאוד: הדבק כאן את כתובת ה-URL החדשה שקיבלת ***
-            gasUrl: '', // <--- הדבק כאן את הכתובת שלך!
+            gasUrl: 'https://script.google.com/macros/s/AKfycbx9MXz3Fogzb4xQWW3lx3AL93ac6nr610fz4pS1Qk1YxKv7YOehu7ZM00mqzlL-y2KMaQ/exec', // <--- הדבק כאן את הכתובת שלך!
 
             state: {
                 settings: {},
