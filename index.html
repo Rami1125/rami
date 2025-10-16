@@ -7,7 +7,6 @@
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <!-- The problematic manifest link has been removed from here -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@400;600;700&display=swap" rel="stylesheet">
@@ -17,31 +16,25 @@
         .chart-container { animation: chart-appear 0.8s ease-out forwards; }
         @keyframes chart-appear { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
         .gauge-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 1.75rem; font-weight: 700; }
-        /* Modal styles */
         .modal { transition: opacity 0.25s ease; }
         .modal-content { transition: transform 0.25s ease; }
-        /* Loading Spinner */
         #loader { border: 5px solid #f3f3f3; border-top: 5px solid #3b82f6; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="bg-gray-100 text-gray-800">
 
-    <!-- Loading Overlay -->
     <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
         <div class="flex flex-col items-center">
             <div id="loader"></div>
-            <p class="text-white mt-4">מתחבר ל-Google Sheets...</p>
+            <p id="loadingText" class="text-white mt-4">מתחבר ל-Google Sheets...</p>
         </div>
     </div>
     
-    <!-- Feedback Modal -->
     <div id="feedbackModal" class="modal fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-40 hidden opacity-0">
         <div class="modal-content bg-white rounded-2xl shadow-xl w-full max-w-md p-6 text-center transform scale-95">
             <h2 id="modalTitle" class="text-2xl font-bold text-gray-900 mb-4">הוצאה עודכנה!</h2>
-            <div id="modalBody" class="space-y-3 text-right">
-                <!-- Content will be injected by JS -->
-            </div>
+            <div id="modalBody" class="space-y-3 text-right"></div>
             <button id="closeModal" class="mt-6 w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-blue-700">הבנתי, תודה!</button>
         </div>
     </div>
@@ -62,6 +55,12 @@
         </div>
 
         <main id="tab-content">
+            <!-- Error Reporter Div -->
+            <div id="error-reporter" class="hidden bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative mb-6" role="alert">
+                <strong class="font-bold">אופס, משהו השתבש!</strong>
+                <span class="block sm:inline" id="error-message"></span>
+            </div>
+
             <!-- Daily Dashboard -->
             <div id="dashboard" class="space-y-6">
                  <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -106,68 +105,52 @@
                     <div class="overflow-x-auto">
                         <table class="min-w-full divide-y divide-gray-200">
                            <thead class="bg-gray-50"><tr><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">תיאור</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">קטגוריה</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">סכום</th><th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">פעולות</th></tr></thead>
-                            <tbody id="dailyExpensesTable" class="bg-white divide-y divide-gray-200">
-                                <!-- Expenses for today will be rendered here -->
-                            </tbody>
+                            <tbody id="dailyExpensesTable" class="bg-white divide-y divide-gray-200"></tbody>
                         </table>
                     </div>
                 </div>
             </div>
 
-            <!-- Placeholder content for other tabs -->
-            <div id="reports" class="hidden space-y-6">
-                <div class="bg-white p-6 rounded-xl shadow-md text-center">
-                    <h2 class="text-2xl font-bold mb-4">דוחות וניתוחים</h2>
-                    <p class="text-gray-600">בקרוב יוצגו כאן דוחות וגרפים מתקדמים.</p>
-                </div>
-            </div>
-            <div id="history" class="hidden space-y-6">
-                <div class="bg-white p-6 rounded-xl shadow-md text-center">
-                    <h2 class="text-2xl font-bold mb-4">היסטוריית הוצאות</h2>
-                    <p class="text-gray-600">בקרוב תוכל לסנן ולחפש בכל היסטוריית ההוצאות.</p>
-                </div>
-            </div>
+            <div id="reports" class="hidden space-y-6"></div>
+            <div id="history" class="hidden space-y-6"></div>
             <div id="settings" class="hidden space-y-6">
-                 <div class="bg-white p-6 rounded-xl shadow-md text-center">
-                    <h2 class="text-2xl font-bold mb-4">הגדרות ותקציב</h2>
-                    <p class="text-gray-600">בקרוב תוכל להגדיר את התקציב החודשי, יעדים וקטגוריות.</p>
+                <div class="bg-white p-6 rounded-xl shadow-md">
+                    <h2 class="text-2xl font-bold mb-4">הגדרות ותקציב חודשי</h2>
+                    <form id="settingsForm" class="space-y-4">
+                        <div>
+                            <label for="monthlyIncome" class="block text-sm font-medium text-gray-700">הכנסה חודשית צפויה (₪)</label>
+                            <input type="number" id="monthlyIncome" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" placeholder="למשל: 10000">
+                        </div>
+                        <div>
+                            <label for="variableSpendingBudget" class="block text-sm font-medium text-gray-700">תקציב להוצאות משתנות (₪)</label>
+                            <input type="number" id="variableSpendingBudget" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" placeholder="למשל: 2500">
+                        </div>
+                        <div>
+                            <label for="savingsGoal" class="block text-sm font-medium text-gray-700">יעד חיסכון חודשי (₪)</label>
+                            <input type="number" id="savingsGoal" class="mt-1 block w-full border-gray-300 rounded-md shadow-sm p-2" placeholder="למשל: 500">
+                        </div>
+                        <div class="pt-2">
+                             <button type="submit" class="w-full bg-green-600 text-white font-bold py-2 px-4 rounded-md hover:bg-green-700">שמור הגדרות</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </main>
     </div>
 
     <script>
-    // --- Dynamic Manifest Injection (Robust Solution) ---
-    const manifest = {
-      "name": "ניהול פיננסי",
-      "short_name": "כספים",
-      "start_url": ".",
-      "display": "standalone",
-      "background_color": "#f3f4f6",
-      "theme_color": "#3b82f6",
-      "icons": [
-        { "src": "https://placehold.co/192x192/3b82f6/white?text=CRM", "sizes": "192x192", "type": "image/png" },
-        { "src": "https://placehold.co/512x512/3b82f6/white?text=CRM", "sizes": "512x512", "type": "image/png" }
-      ]
-    };
+    const manifest = { "name": "ניהול פיננסי", "short_name": "כספים", "start_url": ".", "display": "standalone", "background_color": "#f3f4f6", "theme_color": "#3b82f6", "icons": [ { "src": "https://placehold.co/192x192/3b82f6/white?text=CRM", "sizes": "192x192", "type": "image/png" }, { "src": "https://placehold.co/512x512/3b82f6/white?text=CRM", "sizes": "512x512", "type": "image/png" } ] };
     const manifestBlob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
     const manifestUrl = URL.createObjectURL(manifestBlob);
     const link = document.createElement('link');
     link.rel = 'manifest';
     link.href = manifestUrl;
     document.head.appendChild(link);
-    // --------------------------------------------------------
 
     document.addEventListener('DOMContentLoaded', () => {
         const App = {
-            // *** חשוב מאוד: הדבק כאן את כתובת ה-URL שקיבלת ***
             gasUrl: 'https://script.google.com/macros/s/AKfycbx9MXz3Fogzb4xQWW3lx3AL93ac6nr610fz4pS1Qk1YxKv7YOehu7ZM00mqzlL-y2KMaQ/exec',
-
-            state: {
-                settings: {},
-                expenses: [],
-                isDataLoaded: false,
-            },
+            state: { settings: {}, expenses: [], isDataLoaded: false },
             
             utils: {
                 getTodayDateString: () => new Date().toISOString().split('T')[0],
@@ -175,46 +158,43 @@
             },
             
             api: {
-                fetchFromSheet: async (action, params = {}) => {
-                    if (!App.gasUrl) return null;
-                    document.getElementById('loadingOverlay').classList.remove('hidden');
-                    const url = new URL(App.gasUrl);
-                    url.searchParams.append('action', action);
-                    for (const key in params) {
-                        url.searchParams.append(key, params[key]);
+                _call: async (method, action, payload = {}) => {
+                    const loadingOverlay = document.getElementById('loadingOverlay');
+                    const errorReporter = document.getElementById('error-reporter');
+                    errorReporter.classList.add('hidden');
+
+                    if (!App.gasUrl) {
+                        App.render.error("כתובת ה-URL של Google Apps Script חסרה בקוד.");
+                        return null;
                     }
+                    loadingOverlay.classList.remove('hidden');
+
                     try {
-                        const response = await fetch(url);
-                        if (!response.ok) throw new Error('Network response was not ok');
+                        let response;
+                        if (method === 'GET') {
+                            const url = new URL(App.gasUrl);
+                            url.searchParams.append('action', action);
+                            response = await fetch(url);
+                        } else { // POST
+                             response = await fetch(App.gasUrl, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                                body: JSON.stringify({ action, payload })
+                            });
+                        }
+                        if (!response.ok) throw new Error(`Network error: ${response.statusText}`);
                         const result = await response.json();
-                        return result.data;
+                        return method === 'GET' ? result.data : result;
                     } catch (error) {
-                        console.error(`Error fetching action ${action}:`, error);
-                        alert('שגיאה בתקשורת עם Google Sheets. בדוק את כתובת ה-URL וחיבור האינטרנט.');
+                        console.error(`API call failed for action ${action}:`, error);
+                        App.render.error("שגיאה בתקשורת עם Google Sheets. ודא שהכתובת נכונה ויש חיבור לאינטרנט.");
                         return null;
                     } finally {
-                        document.getElementById('loadingOverlay').classList.add('hidden');
+                        loadingOverlay.classList.add('hidden');
                     }
                 },
-                postToSheet: async (action, payload) => {
-                    if (!App.gasUrl) return null;
-                    document.getElementById('loadingOverlay').classList.remove('hidden');
-                    try {
-                        const response = await fetch(App.gasUrl, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                            body: JSON.stringify({ action, payload })
-                        });
-                        if (!response.ok) throw new Error('Network response was not ok');
-                        return await response.json();
-                    } catch (error) {
-                        console.error(`Error posting action ${action}:`, error);
-                        alert('שגיאה בשמירת נתונים ל-Google Sheets.');
-                        return null;
-                    } finally {
-                       document.getElementById('loadingOverlay').classList.add('hidden');
-                    }
-                }
+                fetchFromSheet: (action) => App.api._call('GET', action),
+                postToSheet: (action, payload) => App.api._call('POST', action, payload)
             },
 
             core: {
@@ -231,25 +211,16 @@
                     e.preventDefault();
                     const clickedTab = e.target.closest('a[data-tab]');
                     if (!clickedTab) return;
-
                     const tabId = clickedTab.dataset.tab;
                     
-                    document.querySelectorAll('#tabs a').forEach(tab => {
-                        tab.classList.remove('tab-active', 'font-semibold');
-                        tab.classList.add('text-gray-500', 'hover:text-blue-600', 'border-transparent');
-                    });
-                    clickedTab.classList.add('tab-active', 'font-semibold');
-                    clickedTab.classList.remove('text-gray-500', 'hover:text-blue-600', 'border-transparent');
+                    document.querySelectorAll('#tabs a').forEach(tab => tab.classList.remove('tab-active'));
+                    clickedTab.classList.add('tab-active');
 
-                    document.querySelectorAll('#tab-content > div').forEach(content => {
-                        content.classList.add('hidden');
-                    });
-                    document.getElementById(tabId).classList.remove('hidden');
+                    document.querySelectorAll('#tab-content > div[id]').forEach(content => content.classList.add('hidden'));
+                    document.getElementById(tabId)?.classList.remove('hidden');
 
                     const renderFunction = App.render[tabId];
-                    if (typeof renderFunction === 'function') {
-                        renderFunction();
-                    }
+                    if (typeof renderFunction === 'function') renderFunction();
                 },
                  addExpense: async (e) => {
                     e.preventDefault();
@@ -266,87 +237,119 @@
                     e.target.reset();
 
                     const result = await App.api.postToSheet('addExpense', newExpense);
-                    if (result && result.status === 'success') {
-                        App.core.showExpenseFeedback(newExpense);
-                        await App.core.loadData(); 
+                    if (result?.status === 'success') {
+                         await App.core.loadData(); 
                     } else {
-                        alert('שגיאה בעדכון ה-Google Sheet.');
+                        App.render.error('שגיאה בשמירת ההוצאה ב-Google Sheet.');
                         App.state.expenses.pop();
                         App.render.dashboard();
                     }
                 },
                 deleteExpense: async (expenseId) => {
-                    if (!confirm('האם אתה בטוח שברצונך למחוק את ההוצאה?')) return;
-                    const expenseIndex = App.state.expenses.findIndex(e => e.id == expenseId);
-                    if (expenseIndex === -1) return;
-                    
-                    const expenseToDelete = App.state.expenses[expenseIndex];
-                    App.state.expenses.splice(expenseIndex, 1);
+                    if (!confirm('האם אתה בטוח?')) return;
+                    const originalExpenses = [...App.state.expenses];
+                    App.state.expenses = App.state.expenses.filter(e => e.id != expenseId);
                     App.render.dashboard();
 
                     const result = await App.api.postToSheet('deleteExpense', { id: expenseId });
-                    
-                    if (!result || result.status !== 'success') {
-                        alert('שגיאה במחיקת ההוצאה מה-Google Sheet.');
-                        App.state.expenses.splice(expenseIndex, 0, expenseToDelete);
+                    if (result?.status !== 'success') {
+                        App.render.error('שגיאה במחיקת ההוצאה מה-Google Sheet.');
+                        App.state.expenses = originalExpenses;
                         App.render.dashboard();
                     }
                 },
-                showExpenseFeedback: (newExpense) => {
-                    // This function remains the same but needs to be implemented fully
-                },
-                saveSettings: async () => {
-                    // This function remains to be implemented
-                },
+                saveSettings: async (e) => {
+                    e.preventDefault();
+                    const newSettings = {
+                        monthlyIncome: parseFloat(document.getElementById('monthlyIncome').value) || 0,
+                        variableSpendingBudget: parseFloat(document.getElementById('variableSpendingBudget').value) || 0,
+                        savingsGoal: parseFloat(document.getElementById('savingsGoal').value) || 0,
+                    };
+                    App.state.settings = newSettings;
+                    const result = await App.api.postToSheet('saveSettings', newSettings);
+                    if (result?.status === 'success') {
+                        alert('ההגדרות נשמרו בהצלחה!');
+                        App.render.all();
+                    } else {
+                        App.render.error('שגיאה בשמירת ההגדרות.');
+                    }
+                }
             },
-
             render: {
                 all: () => {
+                    if (!App.state.isDataLoaded) return;
                     App.render.dashboard();
+                    App.render.settings();
+                    App.render.formOptions();
                 },
                 dashboard: () => {
+                    const today = new Date();
                     const todayString = App.utils.getTodayDateString();
-                    const todaysExpenses = App.state.expenses.filter(exp => exp.date === todayString);
-                    const tableBody = document.getElementById('dailyExpensesTable');
-                    tableBody.innerHTML = '';
+                    const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate();
+                    const daysPassed = today.getDate();
+                    const daysRemaining = daysInMonth - daysPassed + 1;
 
-                    if (todaysExpenses.length === 0) {
-                        tableBody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">אין הוצאות להיום.</td></tr>';
+                    const budget = App.state.settings.variableSpendingBudget || 0;
+                    const expensesThisMonth = App.state.expenses
+                        .filter(e => new Date(e.date).getMonth() === today.getMonth())
+                        .reduce((sum, e) => sum + e.amount, 0);
+                    
+                    const remainingBudget = budget - expensesThisMonth;
+                    const allowedToday = daysRemaining > 0 ? remainingBudget / daysRemaining : 0;
+                    
+                    const todaysExpenses = App.state.expenses.filter(exp => exp.date === todayString);
+                    const todaysExpensesSum = todaysExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+                    const remainingForToday = allowedToday - todaysExpensesSum;
+
+                    document.getElementById('allowedToSpendToday').textContent = App.utils.formatCurrency(allowedToday);
+                    document.getElementById('dailyExpensesSum').textContent = App.utils.formatCurrency(todaysExpensesSum);
+                    document.getElementById('remainingForToday').textContent = App.utils.formatCurrency(remainingForToday);
+                    
+                    const statusEl = document.getElementById('dailyStatusFeedback');
+                    if (remainingForToday >= 0) {
+                        statusEl.textContent = 'עמידה ביעד!';
+                        statusEl.className = 'text-lg font-bold mt-2 px-4 py-2 rounded-full bg-green-100 text-green-700';
                     } else {
-                        todaysExpenses.forEach(exp => {
-                            const row = `
-                                <tr class="hover:bg-gray-50">
-                                    <td class="px-6 py-4">${exp.description}</td>
-                                    <td class="px-6 py-4 text-gray-600">${exp.category}</td>
-                                    <td class="px-6 py-4 font-semibold">${App.utils.formatCurrency(exp.amount)}</td>
-                                    <td class="px-6 py-4">
-                                        <button class="text-red-500 hover:text-red-700 delete-btn" data-id="${exp.id}">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        </button>
-                                    </td>
-                                </tr>
-                            `;
-                            tableBody.insertAdjacentHTML('beforeend', row);
-                        });
+                        statusEl.textContent = 'חריגה מהתקציב';
+                        statusEl.className = 'text-lg font-bold mt-2 px-4 py-2 rounded-full bg-red-100 text-red-700';
                     }
-                    // TODO: Update stats, categories etc.
+
+                    const tableBody = document.getElementById('dailyExpensesTable');
+                    tableBody.innerHTML = todaysExpenses.length === 0 
+                        ? '<tr><td colspan="4" class="text-center py-4 text-gray-500">אין הוצאות להיום.</td></tr>'
+                        : todaysExpenses.map(exp => `
+                            <tr class="hover:bg-gray-50">
+                                <td class="px-6 py-4">${exp.description}</td>
+                                <td class="px-6 py-4 text-gray-600">${exp.category}</td>
+                                <td class="px-6 py-4 font-semibold">${App.utils.formatCurrency(exp.amount)}</td>
+                                <td class="px-6 py-4"><button class="text-red-500 hover:text-red-700 delete-btn" data-id="${exp.id}"><svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button></td>
+                            </tr>`).join('');
                 },
-                reports: () => { /* Placeholder for future implementation */ },
-                history: () => { /* Placeholder for future implementation */ },
-                settings: () => { /* Placeholder for future implementation */ },
+                settings: () => {
+                    document.getElementById('monthlyIncome').value = App.state.settings.monthlyIncome || '';
+                    document.getElementById('variableSpendingBudget').value = App.state.settings.variableSpendingBudget || '';
+                    document.getElementById('savingsGoal').value = App.state.settings.savingsGoal || '';
+                },
+                formOptions: () => {
+                    const categories = [...new Set(App.state.expenses.map(e => e.category))].sort();
+                    const categorySelect = document.getElementById('expenseCategory');
+                    categorySelect.innerHTML = categories.map(c => `<option value="${c}">${c}</option>`).join('');
+
+                    const vendors = [...new Set(App.state.expenses.map(e => e.description))].sort();
+                    const vendorsDatalist = document.getElementById('vendorsDatalist');
+                    vendorsDatalist.innerHTML = vendors.map(v => `<option value="${v}"></option>`).join('');
+                },
+                error: (message) => {
+                    document.getElementById('error-message').textContent = message;
+                    document.getElementById('error-reporter').classList.remove('hidden');
+                }
             },
 
             init: () => {
-                if (!App.gasUrl) {
-                    alert("נא להדביק את כתובת ה-URL של Google Apps Script במשתנה 'gasUrl' בקוד כדי שהאפליקציה תעבוד.");
-                    return;
-                }
-
                 App.core.loadData();
-
-                // Event Listeners
                 document.getElementById('tabs').addEventListener('click', App.core.switchTab);
                 document.getElementById('addExpenseForm').addEventListener('submit', App.core.addExpense);
+                document.getElementById('settingsForm').addEventListener('submit', App.core.saveSettings);
                 document.getElementById('dailyExpensesTable').addEventListener('click', (e) => {
                     const deleteButton = e.target.closest('.delete-btn');
                     if (deleteButton) App.core.deleteExpense(deleteButton.dataset.id);
@@ -359,7 +362,6 @@
                 });
             }
         };
-
         App.init();
     });
     </script>
